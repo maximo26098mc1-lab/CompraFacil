@@ -1,0 +1,63 @@
+{
+  "name": "CompraFácil - E-Commerce Protegido con Control Policial",
+  "short_name": "CompraFácil",
+  "description": "Plataforma interactiva de comercio electrónico C2C / B2C con Módulo de Trazabilidad e Investigación Policial para el mercado argentino.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0072ce",
+  "theme_color": "#0072ce",
+  "lang": "es-AR",
+  "categories": ["shopping", "business", "security"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catálogo",
+      "short_name": "Catálogo",
+      "description": "Ver publicaciones y buscar productos",
+      "url": "./index.html#/catalog",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Radar Policial",
+      "short_name": "Seguridad",
+      "description": "Acceso al módulo de investigaciones judiciales",
+      "url": "./index.html#/security",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Panel Vendedor",
+      "short_name": "Vender",
+      "description": "Publicar y administrar ventas",
+      "url": "./index.html#/seller",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Carrito de Compras",
+      "short_name": "Carrito",
+      "description": "Finalizar compra protegida",
+      "url": "./index.html#/cart",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CompraFácil - Plataforma interactiva de comercio electrónico C2C / B2C con Módulo de Trazabilidad e Investigación Policial para el mercado argentino." />
+  <title>CompraFácil - E-Commerce Protegido con Control Policial</title>
+
+  <!-- Favicon SVG con Escarapela / Sol Argentino -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%230072ce'/><circle cx='50' cy='50' r='32' fill='%23ffffff'/><circle cx='50' cy='50' r='16' fill='%23f6b40e'/></svg>" />
+
+  <!-- PWA Manifest y Meta Tags Móviles -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0072ce" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CompraFácil" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- Estilos Modulares CSS3 -->
+  <link rel="stylesheet" href="css/main.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/security.css" />
+</head>
+<body>
+
+  <!-- Encabezado Principal y Barra de Navegación -->
+  <header class="main-header">
+    <div class="header-top">
+      <div class="container">
+        <div class="header-row">
+          
+          <!-- Logo Institucional CompraFácil -->
+          <a href="#/catalog" class="brand-logo" title="CompraFácil Argentina">
+            <span class="brand-flag">AR</span>
+            <span>Compra<strong>Fácil</strong></span>
+            <span class="brand-badge">Seguro</span>
+          </a>
+
+          <!-- Barra de Búsqueda Interactiva -->
+          <div class="header-search">
+            <form id="header-search-form" class="search-form" role="search">
+              <input 
+                type="text" 
+                id="header-search-input" 
+                class="search-input" 
+                placeholder="Buscar productos, marcas, modelos, números de serie o IMEI..." 
+                autocomplete="off"
+                aria-label="Buscar en CompraFácil"
+              />
+              <button type="submit" class="search-btn" aria-label="Buscar">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </button>
+            </form>
+          </div>
+
+          <!-- Selector de Rol Rápido Demo y Acciones de Usuario -->
+          <div class="header-actions">
+            <!-- Botón de Instalación PWA (Móvil / Desktop) -->
+            <button id="btn-pwa-install" class="btn btn-sm btn-accent" style="display: none; padding: 0.25rem 0.65rem; font-size: 0.78rem;" title="Instalar CompraFácil en tu pantalla de inicio">
+              📲 Instalar App
+            </button>
+
+            <!-- Píldora de Selección de Rol -->
+            <div id="header-role-switcher"></div>
+
+            <!-- Identificación de Usuario -->
+            <div id="header-user-status" style="display: none;"></div>
+
+            <!-- Botón de Carrito -->
+            <a href="#/cart" class="header-action-btn" title="Ver Carrito de Compras" aria-label="Carrito de compras">
+              <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+              </svg>
+              <span id="cart-badge" class="badge-count" style="display: none;">0</span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra de Sub-Navegación -->
+    <div class="header-nav">
+      <div class="container">
+        <div class="header-nav-row">
+          
+          <!-- Ubicación / Envío -->
+          <div id="btn-change-location" class="location-indicator" title="Haga clic para cambiar su ubicación">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span id="current-location-text">Enviar a CABA</span>
+          </div>
+
+          <!-- Enlaces de Secciones Principales -->
+          <nav>
+            <ul class="nav-links">
+              <li>
+                <a href="#/catalog" class="nav-link active">Catálogo de Productos</a>
+              </li>
+              <li>
+                <a href="#/seller" class="nav-link">Panel del Vendedor</a>
+              </li>
+              <li>
+                <a href="#/security" class="nav-link" style="color: #ffffff; font-weight: 700;">
+                  <span>🛡️ Módulo Policial</span>
+                  <span class="nav-security-badge">RADAR ACTIVO</span>
+                </a>
+              </li>
+              <li>
+                <a href="#/admin" class="nav-link">Administración</a>
+              </li>
+            </ul>
+          </nav>
+
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner de Estado de Conexión Offline / PWA -->
+  <div id="offline-banner" style="display: none; background: #f59e0b; color: #1e293b; padding: 0.5rem 1rem; text-align: center; font-size: 0.88rem; font-weight: 700; border-bottom: 1px solid #d97706;">
+    ⚠️ Modo Offline Activo: La plataforma, el catálogo y las consultas continúan operando con datos locales y Service Worker.
+  </div>
+
+  <!-- Contenedor Dinámico para Enrutado de Vistas -->
+  <main id="app-container" role="main"></main>
+
+  <!-- Contenedor Flotante de Notificaciones Toast -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- Pie de Página Institucional -->
+  <footer class="main-footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <h4 class="footer-title">CompraFácil Argentina</h4>
+          <p style="font-size: 0.85rem; line-height: 1.6; margin-bottom: 0.75rem;">
+            Plataforma pionera de comercio electrónico C2C / B2C integrada con protocolos de seguridad preventiva y trazabilidad unívoca de números de serie e IMEI.
+          </p>
+          <div class="footer-security-seal">
+            <span>🛡️</span>
+            <span>Seguridad Homologada C2C</span>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Accesos Rápidos</h4>
+          <ul class="footer-list">
+            <li><a href="#/catalog">Ver Catálogo Completo</a></li>
+            <li><a href="#/seller">Publicar como Vendedor</a></li>
+            <li><a href="#/cart">Mi Carrito de Compras</a></li>
+            <li><a href="#/security">Acceso Fuerzas de Seguridad</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Marco Legal y Prevención</h4>
+          <ul class="footer-list">
+            <li><a href="#/security">Protocolo de Detección Temprana</a></li>
+            <li><a href="#/security">Carga de Denuncias Judiciales</a></li>
+            <li><a href="#/security">Actas de Medida Cautelar</a></li>
+            <li><a href="javascript:void(0)">Defensa de las y los Consumidores</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-title">Formas de Pago y Envío</h4>
+          <p style="font-size: 0.82rem; line-height: 1.5; margin-bottom: 0.5rem;">
+            Cobros y pagos protegidos mediante <strong>Mercado Pago</strong>, <strong>Transferencias Bancarias CBU/Alias</strong> y <strong>Puntos Seguros de Intercambio</strong> con monitoreo policial.
+          </p>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <span class="badge badge-info">Mercado Pago</span>
+            <span class="badge badge-secondary">CBU Inmediato</span>
+            <span class="badge badge-success">Andreani / Correo Arg</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          © 2026 CompraFácil S.A. - CUIT: 30-71829910-4. Todos los derechos reservados.
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-light);">
+          Desarrollado bajo arquitectura Vanilla JS Modular (ES6) sin dependencias externas.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Script Principal de Aplicación ES6 Module -->
+  <script type="module" src="js/app.js"></script>
+
+</body>
+</html>
