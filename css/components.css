@@ -46,6 +46,15 @@
   box-shadow: var(--shadow-md);
 }
 
+.btn-whatsapp {
+  background-color: #25D366;
+  color: #ffffff;
+}
+.btn-whatsapp:hover {
+  background-color: #1ebd5b;
+  box-shadow: var(--shadow-md);
+}
+
 .btn-secondary {
   background-color: #f1f5f9;
   color: var(--text-main);

@@ -3,7 +3,7 @@
  * Permite instalación en dispositivos móviles/desktop y funcionamiento 100% offline.
  */
 
-const CACHE_NAME = 'comprafacil-pwa-v1';
+const CACHE_NAME = 'comprafacil-pwa-v2';
 
 const STATIC_ASSETS = [
   './',
@@ -17,12 +17,13 @@ const STATIC_ASSETS = [
   './css/security.css',
   './js/app.js',
   './js/state.js',
+  './js/supabaseClient.js',
   './js/modules/auth.js',
   './js/modules/catalog.js',
   './js/modules/productDetail.js',
-  './js/modules/cart.js',
   './js/modules/sellerDashboard.js',
   './js/modules/securityModule.js',
+  './js/modules/legal.js',
   './js/modules/admin.js'
 ];
 

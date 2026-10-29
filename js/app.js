@@ -1,5 +1,5 @@
 /**
- * CompraFácil - Controlador Principal y Enrutador SPA
+ * CompraFácil v2 - Controlador Principal y Enrutador SPA
  * js/app.js
  */
 
@@ -7,10 +7,9 @@ import { state } from './state.js';
 import { auth } from './modules/auth.js';
 import { catalog } from './modules/catalog.js';
 import { productDetail } from './modules/productDetail.js';
-import { cart } from './modules/cart.js';
 import { sellerDashboard } from './modules/sellerDashboard.js';
 import { securityModule } from './modules/securityModule.js';
-import { admin } from './modules/admin.js';
+import { legal } from './modules/legal.js';
 
 class AppController {
   constructor() {
@@ -19,12 +18,10 @@ class AppController {
   }
 
   init() {
-    console.log('Inicializando CompraFácil (Vanilla JS Modular)...');
+    console.log('Inicializando CompraFácil v2 (Clasificados con Contacto Directo)...');
     
     // Configurar componentes globales
     auth.renderRoleSwitcher('header-role-switcher');
-    auth.renderUserStatus('header-user-status');
-    this.updateCartBadge();
     this._setupGlobalEvents();
     this._setupSearchHeader();
     this._setupPWA();
@@ -42,7 +39,8 @@ class AppController {
   handleRouting() {
     const rawHash = window.location.hash.slice(1) || '/';
     this.currentRoute = rawHash;
-    const parts = rawHash.split('/').filter(Boolean);
+    const cleanHash = rawHash.split('?')[0];
+    const parts = cleanHash.split('/').filter(Boolean);
     const mainSection = parts[0] || 'catalog';
 
     // Actualizar clase activa en enlaces de navegación
@@ -60,14 +58,21 @@ class AppController {
       catalog.render();
     } else if (mainSection === 'product' && parts[1]) {
       productDetail.render(parts[1]);
-    } else if (mainSection === 'cart') {
-      cart.render();
     } else if (mainSection === 'seller') {
       sellerDashboard.render();
     } else if (mainSection === 'security') {
       securityModule.render();
-    } else if (mainSection === 'admin') {
-      admin.render();
+    } else if (mainSection === 'terms') {
+      legal.renderTerms();
+    } else if (mainSection === 'privacy') {
+      legal.renderPrivacy();
+    } else if (mainSection === 'report') {
+      const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+      legal.renderReportForm(urlParams.get('id') || '');
+    } else if (mainSection === 'cart') {
+      // Redirección explicativa si quedó algún enlace antiguo
+      this.showToast('CompraFácil no procesa carritos ni cobros. El contacto es directo por WhatsApp.', 'info');
+      window.location.hash = '#/catalog';
     } else {
       // Fallback a catálogo
       catalog.render();
@@ -75,15 +80,6 @@ class AppController {
 
     // Scroll to top
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  updateCartBadge() {
-    const badge = document.getElementById('cart-badge');
-    if (!badge) return;
-    const items = state.getCart();
-    const totalCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    badge.textContent = totalCount;
-    badge.style.display = totalCount > 0 ? 'flex' : 'none';
   }
 
   showToast(message, type = 'info') {
@@ -136,7 +132,6 @@ class AppController {
     document.body.appendChild(backdrop);
     this.modalEl = backdrop;
 
-    // Eventos de cierre
     const closeBtns = backdrop.querySelectorAll('.modal-close, .modal-close-btn');
     closeBtns.forEach(btn => btn.addEventListener('click', () => this.closeModal()));
     backdrop.addEventListener('click', (e) => {
@@ -174,11 +169,11 @@ class AppController {
     const locBtn = document.getElementById('btn-change-location');
     if (locBtn) {
       locBtn.addEventListener('click', () => {
-        const prov = prompt('Ingresá tu provincia o localidad de entrega preferida en Argentina:', 'CABA');
+        const prov = prompt('Ingresá tu provincia o zona de búsqueda preferida en Argentina:', 'CABA');
         if (prov) {
           const locText = document.getElementById('current-location-text');
-          if (locText) locText.textContent = `Enviar a ${prov}`;
-          this.showToast(`Ubicación actualizada a ${prov}`, 'success');
+          if (locText) locText.textContent = `Zona: ${prov}`;
+          this.showToast(`Zona actualizada a ${prov}`, 'success');
         }
       });
     }
@@ -190,7 +185,7 @@ class AppController {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .then((registration) => {
-            console.log('[PWA] ServiceWorker registrado con éxito. Ámbito:', registration.scope);
+            console.log('[PWA] ServiceWorker v2 registrado con éxito. Ámbito:', registration.scope);
           })
           .catch((err) => {
             console.warn('[PWA] Error registrando ServiceWorker:', err);
@@ -198,7 +193,7 @@ class AppController {
       });
     }
 
-    // 2. Captura del evento de instalación en pantalla de inicio (Desktop/Móvil)
+    // 2. Captura del evento de instalación en pantalla de inicio
     let deferredPrompt = null;
     const installBtn = document.getElementById('btn-pwa-install');
 
@@ -220,7 +215,7 @@ class AppController {
     });
 
     window.addEventListener('appinstalled', () => {
-      console.log('[PWA] CompraFácil fue instalada en el dispositivo.');
+      console.log('[PWA] CompraFácil v2 fue instalada en el dispositivo.');
       if (installBtn) installBtn.style.display = 'none';
       this.showToast('¡CompraFácil se instaló en tu dispositivo!', 'success');
     });
@@ -246,18 +241,13 @@ class AppController {
 
   _handleStateChange(detail) {
     const { action } = detail;
-    this.updateCartBadge();
-    auth.renderUserStatus('header-user-status');
     auth.renderRoleSwitcher('header-role-switcher');
 
-    // Re-renderizado condicional si estamos en ciertas vistas
-    if (action === 'CART_UPDATED' && this.currentRoute.includes('cart')) {
-      cart.render();
-    } else if (action === 'PRODUCT_FROZEN' || action === 'PRODUCT_UNFROZEN') {
-      if (this.currentRoute.includes('security')) {
-        securityModule.render();
-      } else if (this.currentRoute.includes('catalog') || this.currentRoute === '/') {
+    if (action === 'AD_ADDED' || action === 'AD_UPDATED' || action === 'AD_DELETED') {
+      if (this.currentRoute.includes('catalog') || this.currentRoute === '/') {
         catalog.render();
+      } else if (this.currentRoute.includes('seller')) {
+        sellerDashboard.render();
       }
     } else if (action === 'USER_CHANGED') {
       this.handleRouting();
@@ -270,7 +260,6 @@ class AppController {
 export const app = new AppController();
 window.app = app;
 
-// Auto-arranque al cargar el DOM
 document.addEventListener('DOMContentLoaded', () => {
   app.init();
 });

@@ -37,11 +37,10 @@ export const admin = {
     const currentState = state.getState();
     const products = currentState.products || [];
     const users = currentState.users || [];
-    const reports = currentState.securityReports || [];
-    const orders = currentState.orders || [];
+    const records = currentState.securityRecords || [];
+    const reports = currentState.adReports || [];
     const logs = currentState.auditLog || [];
-    const frozenCount = products.filter(p => p.isFrozen).length;
-    const totalVolume = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const soldCount = products.filter(p => p.status === 'vendido').length;
 
     const html = `
       <div class="container">
@@ -68,24 +67,24 @@ export const admin = {
             </div>
           </div>
           <div class="metric-card">
-            <div class="metric-icon">🛒</div>
+            <div class="metric-icon">📢</div>
             <div>
               <div class="metric-value">${products.length}</div>
-              <div class="metric-label">Publicaciones Totales</div>
+              <div class="metric-label">Anuncios en Plataforma</div>
             </div>
           </div>
           <div class="metric-card">
-            <div class="metric-icon">⚖️</div>
+            <div class="metric-icon">🤝</div>
             <div>
-              <div class="metric-value" style="color: #ef4444;">${frozenCount}</div>
-              <div class="metric-label">Medidas Cautelares Activas</div>
+              <div class="metric-value" style="color: #059669;">${soldCount}</div>
+              <div class="metric-label">Artículos Vendidos</div>
             </div>
           </div>
           <div class="metric-card">
-            <div class="metric-icon">💵</div>
+            <div class="metric-icon">🚩</div>
             <div>
-              <div class="metric-value">${state.formatARS(totalVolume)}</div>
-              <div class="metric-label">Volumen Transaccionado</div>
+              <div class="metric-value" style="color: #ef4444;">${reports.length}</div>
+              <div class="metric-label">Reportes de Publicación</div>
             </div>
           </div>
         </div>
@@ -133,16 +132,16 @@ export const admin = {
               <strong style="color: #059669;">Operativo (localStorage reactivo)</strong>
             </li>
             <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-              <span>Módulo Policial de Trazabilidad:</span>
-              <strong style="color: #0072ce;">Conectado a Red Nacional de Investigaciones</strong>
+              <span>Módulo de Indicios para Autoridades:</span>
+              <strong style="color: #0072ce;">Modo evaluación (datos ficticios de desarrollo)</strong>
             </li>
             <li style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
-              <span>Denuncias de Robo Registradas:</span>
-              <strong>${reports.length} causas activas</strong>
+              <span>Fichas de Bienes Registradas:</span>
+              <strong>${state.getSecurityRecords().length} fichas</strong>
             </li>
             <li style="display: flex; justify-content: space-between;">
-              <span>Publicaciones Inmovilizadas Cautelarmente:</span>
-              <strong style="color: #ef4444;">${products.filter(p => p.isFrozen).length} unidades</strong>
+              <span>Canal de Contacto:</span>
+              <strong style="color: #059669;">WhatsApp Directo</strong>
             </li>
           </ul>
         </div>
@@ -173,9 +172,9 @@ export const admin = {
             <tr>
               <th>Producto</th>
               <th>Vendedor</th>
-              <th>Identificador / Serie</th>
+              <th>WhatsApp</th>
               <th>Precio</th>
-              <th>Estado Cautelar</th>
+              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -184,26 +183,20 @@ export const admin = {
               <tr>
                 <td>
                   <div style="font-weight: 600; font-size: 0.9rem;">${p.title}</div>
-                  <div style="font-size: 0.78rem; color: var(--text-muted);">${p.category}</div>
+                  <div style="font-size: 0.78rem; color: var(--text-muted);">${p.category} • 📍 ${p.city || ''}, ${p.province}</div>
                 </td>
                 <td style="font-size: 0.85rem;">${p.sellerName}</td>
-                <td><code>${p.serialNumber || p.imei || p.frameNumber || 'N/A'}</code></td>
+                <td><code style="color: #059669;">${p.whatsapp || 'Sin WhatsApp'}</code></td>
                 <td style="font-weight: 700;">${state.formatARS(p.price)}</td>
                 <td>
-                  ${p.isFrozen ? `
-                    <span class="badge badge-danger">Bloqueado Judicial</span>
-                  ` : `
-                    <span class="badge badge-success">Aprobado</span>
-                  `}
+                  <span class="badge ${p.status === 'vendido' ? 'badge-secondary' : p.status === 'disponible' ? 'badge-success' : 'badge-warning'}">
+                    ${p.status ? p.status.toUpperCase() : 'DISPONIBLE'}
+                  </span>
                 </td>
                 <td>
                   <div style="display: flex; gap: 0.4rem;">
-                    ${p.isFrozen ? `
-                      <button class="btn btn-sm btn-secondary btn-admin-unfreeze" data-id="${p.id}">Desbloquear</button>
-                    ` : `
-                      <button class="btn btn-sm btn-danger btn-admin-freeze" data-id="${p.id}">Bloquear</button>
-                    `}
-                    <button class="btn btn-sm btn-danger btn-admin-delete" data-id="${p.id}">🗑️</button>
+                    <a href="#/product/${p.id}" class="btn btn-sm btn-secondary" title="Ver anuncio">Ver</a>
+                    <button class="btn btn-sm btn-danger btn-admin-delete" data-id="${p.id}" title="Retirar anuncio">Retirar</button>
                   </div>
                 </td>
               </tr>
@@ -303,24 +296,7 @@ export const admin = {
       });
     }
 
-    // Bloquear/Desbloquear desde admin
-    container.querySelectorAll('.btn-admin-freeze').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        state.freezeProduct(id, 'Inmovilización preventiva por intervención de la administración.');
-        this.render();
-      });
-    });
-
-    container.querySelectorAll('.btn-admin-unfreeze').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = btn.getAttribute('data-id');
-        state.unfreezeProduct(id);
-        this.render();
-      });
-    });
-
-    // Eliminar producto
+    // Eliminar / retirar anuncio
     container.querySelectorAll('.btn-admin-delete').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');

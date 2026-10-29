@@ -1,7 +1,7 @@
 {
-  "name": "CompraFácil - E-Commerce Protegido con Control Policial",
+  "name": "CompraFácil - Anuncios Clasificados y Contacto Directo",
   "short_name": "CompraFácil",
-  "description": "Plataforma interactiva de comercio electrónico C2C / B2C con Módulo de Trazabilidad e Investigación Policial para el mercado argentino.",
+  "description": "Plataforma de anuncios clasificados con contacto directo por WhatsApp entre vendedores y compradores.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -9,7 +9,7 @@
   "background_color": "#0072ce",
   "theme_color": "#0072ce",
   "lang": "es-AR",
-  "categories": ["shopping", "business", "security"],
+  "categories": ["shopping", "business"],
   "icons": [
     {
       "src": "icons/icon-192.png",
@@ -34,29 +34,29 @@
     {
       "name": "Catálogo",
       "short_name": "Catálogo",
-      "description": "Ver publicaciones y buscar productos",
+      "description": "Explorar anuncios clasificados",
       "url": "./index.html#/catalog",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Radar Policial",
-      "short_name": "Seguridad",
-      "description": "Acceso al módulo de investigaciones judiciales",
-      "url": "./index.html#/security",
-      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Panel Vendedor",
-      "short_name": "Vender",
-      "description": "Publicar y administrar ventas",
+      "name": "Publicar Anuncio",
+      "short_name": "Publicar",
+      "description": "Publicar un nuevo aviso con WhatsApp",
       "url": "./index.html#/seller",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Carrito de Compras",
-      "short_name": "Carrito",
-      "description": "Finalizar compra protegida",
-      "url": "./index.html#/cart",
+      "name": "Términos y Condiciones",
+      "short_name": "Términos",
+      "description": "Reglas y responsabilidades",
+      "url": "./index.html#/terms",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Módulo Autoridades",
+      "short_name": "Autoridades",
+      "description": "Acceso restringido para autoridades acreditadas",
+      "url": "./index.html#/security",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }
   ]
