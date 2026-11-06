@@ -7,11 +7,15 @@ import { state, generateWhatsAppLink } from '../state.js';
 import { auth } from './auth.js';
 
 export const productDetail = {
-  render(adId, containerId = 'app-container') {
+  async render(adId, containerId = 'app-container') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const ad = state.getProductById(adId);
+    let ad = state.getProductById(adId);
+    if (!ad && state.fetchProductById) {
+      ad = await state.fetchProductById(adId);
+    }
+
     if (!ad || ad.status === 'retirado') {
       container.innerHTML = `
         <div class="container" style="text-align: center; padding: 4rem 1rem;">

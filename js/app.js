@@ -17,14 +17,17 @@ class AppController {
     this.modalEl = null;
   }
 
-  init() {
-    console.log('Inicializando CompraFácil v2 (Clasificados con Contacto Directo)...');
+  async init() {
+    console.log('Inicializando CompraFácil v2 (Clasificados con Contacto Directo y Supabase Auth)...');
     
     // Configurar componentes globales
-    auth.renderRoleSwitcher('header-role-switcher');
+    await auth.init();
+    auth.renderAuthUI('header-role-switcher');
+    await state.fetchListings();
     this._setupGlobalEvents();
     this._setupSearchHeader();
     this._setupPWA();
+    this._handleAuthUrlHash();
 
     // Escuchar eventos de cambio de estado reactivo
     window.addEventListener('comprafacil:statechange', (e) => {
@@ -32,8 +35,45 @@ class AppController {
     });
 
     // Enrutador Hash
-    window.addEventListener('hashchange', () => this.handleRouting());
+    window.addEventListener('hashchange', () => {
+      this._handleAuthUrlHash();
+      this.handleRouting();
+    });
     this.handleRouting();
+  }
+
+  _handleAuthUrlHash() {
+    const hash = window.location.hash || '';
+    if (!hash) return;
+
+    // Procesar posibles errores retornados por enlaces de Supabase Auth
+    if (hash.includes('error_description=')) {
+      const params = new URLSearchParams(hash.slice(1));
+      const errorDesc = params.get('error_description');
+      if (errorDesc) {
+        const cleanDesc = decodeURIComponent(errorDesc.replace(/\+/g, ' '));
+        this.showToast(`Error de autenticación: ${cleanDesc}`, 'error');
+        window.location.hash = '#/catalog';
+        return;
+      }
+    }
+
+    // Procesar enlace de recuperación o confirmación sin romper rutas
+    if (hash.includes('type=recovery')) {
+      auth.openUpdatePasswordModal();
+      setTimeout(() => {
+        if (window.location.hash.includes('type=recovery')) {
+          window.location.hash = '#/catalog';
+        }
+      }, 500);
+    } else if (hash.includes('type=signup') || (hash.includes('access_token=') && !hash.startsWith('#/'))) {
+      this.showToast('¡Correo verificado con éxito!', 'success');
+      setTimeout(() => {
+        if (!window.location.hash.startsWith('#/')) {
+          window.location.hash = '#/catalog';
+        }
+      }, 500);
+    }
   }
 
   handleRouting() {
@@ -42,6 +82,12 @@ class AppController {
     const cleanHash = rawHash.split('?')[0];
     const parts = cleanHash.split('/').filter(Boolean);
     const mainSection = parts[0] || 'catalog';
+
+    // Si el hash corresponde a tokens de Supabase, no interferir con la navegación
+    if (mainSection.includes('access_token') || mainSection.includes('error_code')) {
+      catalog.render();
+      return;
+    }
 
     // Actualizar clase activa en enlaces de navegación
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -241,9 +287,9 @@ class AppController {
 
   _handleStateChange(detail) {
     const { action } = detail;
-    auth.renderRoleSwitcher('header-role-switcher');
+    auth.renderAuthUI('header-role-switcher');
 
-    if (action === 'AD_ADDED' || action === 'AD_UPDATED' || action === 'AD_DELETED') {
+    if (action === 'AD_ADDED' || action === 'AD_UPDATED' || action === 'AD_DELETED' || action === 'LISTINGS_LOADED') {
       if (this.currentRoute.includes('catalog') || this.currentRoute === '/') {
         catalog.render();
       } else if (this.currentRoute.includes('seller')) {

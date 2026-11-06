@@ -6,6 +6,8 @@
  * Sin procesamiento de pagos, envíos ni datos financieros.
  */
 
+import { getSupabase, loadListingImage, clearImageCache } from './supabaseClient.js';
+
 const STORAGE_KEY = 'comprafacil_state_v2';
 
 // Función para normalizar números de WhatsApp al formato internacional E.164 sin símbolos
@@ -45,39 +47,8 @@ export function generateWhatsAppLink(rawPhone, adTitle, adPrice, adId) {
 
 // Semillero Inicial de Datos V2 (Plataforma de Anuncios C2C/B2C con Contacto Directo)
 const DEFAULT_SEED = {
-  currentUser: {
-    id: 'u-anunciante-1',
-    name: 'Martín Gómez',
-    email: 'martin.gomez@ejemplo.com',
-    role: 'seller', // 'buyer' | 'seller' | 'authority' | 'admin'
-    location: 'CABA - Palermo'
-  },
-  users: [
-    {
-      id: 'u-comprador-1',
-      name: 'Luciana Morales',
-      email: 'luciana.compradora@ejemplo.com',
-      role: 'buyer',
-      location: 'CABA - Caballito'
-    },
-    {
-      id: 'u-anunciante-1',
-      name: 'Martín Gómez',
-      email: 'martin.gomez@ejemplo.com',
-      role: 'seller',
-      location: 'CABA - Palermo',
-      phone: '+54 9 11 5566-7788'
-    },
-    {
-      id: 'u-autoridad-1',
-      name: 'Inspector R. Benítez',
-      email: 'r.benitez@investigaciones.gob.ar',
-      role: 'authority',
-      badgeNumber: 'DIJ-AUT-8812',
-      institution: 'División de Investigaciones Judiciales (Acreditación Requerida)',
-      phone: '+54 11 4370-5800'
-    }
-  ],
+  currentUser: null,
+  users: [],
   categories: [
     'Celulares y Smartphones',
     'Bicicletas y Movilidad',
@@ -313,19 +284,132 @@ class StateManager {
     return this.state.currentUser;
   }
 
-  setCurrentUser(userOrRole) {
-    if (typeof userOrRole === 'string') {
-      const matched = this.state.users.find(u => u.role === userOrRole);
-      if (matched) {
-        this.state.currentUser = { ...matched };
-      }
-    } else if (userOrRole && userOrRole.id) {
-      this.state.currentUser = { ...userOrRole };
+  setCurrentUser(supabaseUser) {
+    if (supabaseUser && supabaseUser.id) {
+      this.state.currentUser = {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.email.split('@')[0],
+        phone: supabaseUser.user_metadata?.phone || '',
+        role: 'user'
+      };
+    } else {
+      this.state.currentUser = null;
+      clearImageCache();
     }
     this._notify('USER_CHANGED', this.state.currentUser);
+    this.fetchListings();
   }
 
-  // Anuncios
+  // Anuncios y Sincronización con Supabase 'listings'
+  mapListingRowToProduct(row, resolvedImageUrl = null) {
+    if (!row) return null;
+    const rawPath = row.image_url || '';
+    return {
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      price: Number(row.price),
+      condition: row.condition,
+      brand: row.brand || '',
+      model: row.model || '',
+      serialNumber: row.serial_number || '',
+      whatsapp: row.whatsapp,
+      whatsappNormalized: normalizeWhatsApp(row.whatsapp),
+      province: row.province,
+      city: row.city,
+      sellerId: row.user_id,
+      sellerName: row.seller_name || 'Vendedor',
+      imagePath: rawPath,
+      image: resolvedImageUrl || rawPath || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=600&q=80',
+      description: row.description || '',
+      status: row.status || 'disponible',
+      termsAccepted: true,
+      termsAcceptedAt: row.terms_accepted_at || row.created_at,
+      termsVersion: row.terms_version || 'v2.0-draft',
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      fromSupabase: true
+    };
+  }
+
+  async fetchListings() {
+    const supabase = getSupabase();
+    if (!supabase) return this.getProducts(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Consulta a Supabase listings (la tabla aún podría no estar creada):', error.message);
+        return this.getProducts(true);
+      }
+
+      if (data && data.length > 0) {
+        // Cargar las fotos privadas mediante la sesión autenticada de Supabase
+        const mapped = await Promise.all(data.map(async (row) => {
+          let resolved = '';
+          if (row.image_url) {
+            resolved = await loadListingImage(row.image_url);
+          }
+          return this.mapListingRowToProduct(row, resolved);
+        }));
+
+        this.state.products = mapped;
+        this._persist(this.state);
+        this._notify('LISTINGS_LOADED', this.state.products);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('Error sincronizando listings de Supabase:', err);
+    }
+    return this.getProducts(true);
+  }
+
+  async fetchProductById(id) {
+    let existing = this.getProductById(id);
+    if (existing) {
+      if (existing.imagePath && (!existing.image || existing.image === existing.imagePath)) {
+        existing.image = await loadListingImage(existing.imagePath);
+      }
+      return existing;
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const resolved = data.image_url ? await loadListingImage(data.image_url) : '';
+        const product = this.mapListingRowToProduct(data, resolved);
+        this.state.products.unshift(product);
+        this._persist(this.state);
+        return product;
+      }
+    } catch (err) {
+      console.warn('Error al buscar anuncio por ID en Supabase:', err);
+    }
+    return null;
+  }
+
+  addProductFromSupabase(row, resolvedImageUrl = null) {
+    const newAd = this.mapListingRowToProduct(row, resolvedImageUrl);
+    this.state.products = this.state.products.filter(p => p.id !== newAd.id);
+    this.state.products.unshift(newAd);
+    this._persist(this.state);
+    this._notify('AD_ADDED', newAd);
+    return newAd;
+  }
+
   getProducts(includeAllStatuses = false) {
     if (includeAllStatuses) {
       return this.state.products.filter(p => p.status !== 'retirado');

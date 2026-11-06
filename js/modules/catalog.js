@@ -4,6 +4,7 @@
  */
 
 import { state } from '../state.js';
+import { auth } from './auth.js';
 
 export const catalog = {
   currentFilters: {
@@ -111,6 +112,15 @@ export const catalog = {
               </a>
             </div>
           </div>
+
+          ${!auth.isAuthenticated() ? `
+            <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.85rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+              <div style="font-size: 0.88rem; color: var(--text-muted);">
+                🔒 <strong>Acceso al catálogo:</strong> Para ver los anuncios en tiempo real de la base de datos Supabase, iniciá sesión con tu cuenta.
+              </div>
+              <button id="btn-catalog-login" class="btn btn-sm btn-outline">Iniciar Sesión</button>
+            </div>
+          ` : ''}
 
           <div class="catalog-layout">
             <!-- Barra Lateral de Filtros -->
@@ -333,6 +343,13 @@ export const catalog = {
     const emptyResetBtn = container.querySelector('#btn-empty-reset');
     if (emptyResetBtn) {
       emptyResetBtn.addEventListener('click', () => this.resetFilters());
+    }
+
+    const btnCatalogLogin = container.querySelector('#btn-catalog-login');
+    if (btnCatalogLogin) {
+      btnCatalogLogin.addEventListener('click', () => {
+        auth.openAuthModal('login');
+      });
     }
   }
 };

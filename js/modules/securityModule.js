@@ -79,24 +79,14 @@ export const securityModule = {
           <div style="font-size: 3.5rem; margin-bottom: 1rem;">🛡️</div>
           <h2 style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">ACCESO RESTRINGIDO A AUTORIDADES ACREDITADAS</h2>
           <p style="color: var(--text-muted); max-width: 580px; margin: 1rem auto 1.5rem; line-height: 1.6;">
-            Este módulo requiere inicio de sesión con cuenta institucional verificada y doble factor de autenticación (2FA). Ocultar menús no sustituye la seguridad del servidor; en producción este módulo está blindado mediante políticas RLS en base de datos.
+            Este módulo requiere inicio de sesión con cuenta institucional verificada y doble factor de autenticación (2FA). Ocultar menús no sustituye la seguridad del servidor; este módulo permanece estrictamente bloqueado hasta la implementación de verificación institucional en el backend.
           </p>
-          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; max-width: 540px; margin: 0 auto 1.5rem; text-align: left; font-size: 0.88rem;">
-            <strong>Simulación para Evaluación de Desarrollo:</strong><br>
-            Para probar las interfaces y el motor de indicios en este entorno local, cambie el perfil a <strong>"Autoridad Acreditada"</strong> desde el selector superior de la barra de navegación.
+          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 1.25rem; max-width: 540px; margin: 0 auto 1.5rem; text-align: left; font-size: 0.88rem; color: #64748b;">
+            🔒 <strong>Estado de Seguridad:</strong> Acceso denegado para cuentas de usuario común. No se admiten elevaciones de permisos desde el cliente.
           </div>
-          <button id="btn-switch-authority" class="btn btn-primary">
-            Cambiar a Perfil Autoridad (Demo)
-          </button>
+          <a href="#/catalog" class="btn btn-secondary">Volver al Catálogo</a>
         </div>
       `;
-      const btn = container.querySelector('#btn-switch-authority');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          auth.switchRole('authority');
-          this.render();
-        });
-      }
       return;
     }
 

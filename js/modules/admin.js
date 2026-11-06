@@ -19,18 +19,11 @@ export const admin = {
           <div style="font-size: 3rem; margin-bottom: 1rem;">⚙️</div>
           <h2>Acceso Reservado a Administradores</h2>
           <p style="color: var(--text-muted); margin: 1rem 0;">
-            Tu usuario actual no posee permisos de Administrador de Plataforma.
+            El módulo de administración se encuentra estrictamente bloqueado. Las cuentas de usuario común no poseen permisos administrativos.
           </p>
-          <button id="btn-switch-admin" class="btn btn-primary">Cambiar a Rol Administrador</button>
+          <a href="#/catalog" class="btn btn-secondary">Volver al Catálogo</a>
         </div>
       `;
-      const btn = container.querySelector('#btn-switch-admin');
-      if (btn) {
-        btn.addEventListener('click', () => {
-          auth.switchRole('admin');
-          this.render();
-        });
-      }
       return;
     }
 

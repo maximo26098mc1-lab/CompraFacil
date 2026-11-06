@@ -5,6 +5,7 @@
 
 import { state, normalizeWhatsApp } from '../state.js';
 import { auth } from './auth.js';
+import { getSupabase, loadListingImage } from '../supabaseClient.js';
 
 export const sellerDashboard = {
   activeTab: 'my-ads', // 'my-ads' | 'new-ad' | 'edit-ad'
@@ -17,19 +18,18 @@ export const sellerDashboard = {
     if (!auth.canAccessSeller()) {
       container.innerHTML = `
         <div class="container" style="text-align: center; padding: 4rem 1rem;">
-          <div style="font-size: 3rem; margin-bottom: 1rem;">🏪</div>
-          <h2>Panel de Anunciantes</h2>
+          <div style="font-size: 3rem; margin-bottom: 1rem;">🔒</div>
+          <h2>Identificación Requerida</h2>
           <p style="color: var(--text-muted); margin: 1rem 0;">
-            Tu perfil actual no tiene rol de Anunciante. Podés cambiar el rol desde el selector superior para probar esta función.
+            Para publicar nuevos avisos o gestionar tus publicaciones existentes, debes iniciar sesión con tu cuenta de CompraFácil.
           </p>
-          <button id="btn-switch-seller" class="btn btn-primary">Cambiar a Rol Anunciante</button>
+          <button id="btn-login-to-sell" class="btn btn-primary">Iniciar Sesión / Registrarse</button>
         </div>
       `;
-      const btn = container.querySelector('#btn-switch-seller');
+      const btn = container.querySelector('#btn-login-to-sell');
       if (btn) {
         btn.addEventListener('click', () => {
-          auth.switchRole('seller');
-          this.render();
+          auth.openAuthModal('login');
         });
       }
       return;
@@ -37,8 +37,8 @@ export const sellerDashboard = {
 
     const currentUser = auth.getCurrentUser();
     const allAds = state.getState().products || [];
-    // Anuncios del usuario actual (en modo local / demo)
-    const myAds = allAds.filter(a => a.sellerId === currentUser.id || currentUser.id === 'u-anunciante-1');
+    // Anuncios asociados al usuario autenticado actual
+    const myAds = currentUser ? allAds.filter(a => a.sellerId === currentUser.id) : [];
     const activeCount = myAds.filter(a => a.status === 'disponible').length;
     const soldCount = myAds.filter(a => a.status === 'vendido').length;
 
@@ -280,9 +280,33 @@ export const sellerDashboard = {
               <input type="text" id="new-ad-serial" class="form-input" placeholder="Ej: F2LXT909MD6R" />
               <div class="form-help">Permite certificar la autenticidad del bien.</div>
             </div>
-            <div class="form-group">
-              <label class="form-label">URL de Fotografía</label>
-              <input type="url" id="new-ad-image" class="form-input" placeholder="https://images.unsplash.com/..." value="https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=600&q=80" />
+          </div>
+
+          <!-- Fotografía del Producto (Supabase Storage) -->
+          <div class="form-group" style="background: #f8fafc; border: 1px solid var(--border-color); padding: 1.25rem; border-radius: var(--radius-md);">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 0.5rem; display: block;">
+              Fotografía del Producto <span class="required">*</span>
+            </label>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+                  Subir archivo desde tu dispositivo (se almacena en tu carpeta privada de Supabase Storage):
+                </label>
+                <input type="file" id="new-ad-photo-file" class="form-input" accept="image/png, image/jpeg, image/jpg, image/webp" />
+              </div>
+              <div>
+                <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+                  O ingresar enlace web (URL):
+                </label>
+                <input type="url" id="new-ad-image-url" class="form-input" placeholder="https://images.unsplash.com/... (opcional si seleccionás un archivo)" />
+              </div>
+              <div id="new-ad-photo-preview" style="display: none; align-items: center; gap: 1rem; padding: 0.75rem; background: #ffffff; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                <img id="new-ad-preview-img" src="" alt="Vista previa" style="width: 70px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" />
+                <div style="font-size: 0.85rem;">
+                  <strong id="new-ad-preview-name" style="color: var(--text-main); display: block;"></strong>
+                  <span id="new-ad-preview-size" style="color: var(--text-muted);"></span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -301,9 +325,12 @@ export const sellerDashboard = {
             </label>
           </div>
 
+          <!-- Mensaje de Error en Guardado -->
+          <div id="new-ad-error-box" style="display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 0.85rem 1rem; border-radius: var(--radius-md); margin-top: 1rem; font-size: 0.88rem;"></div>
+
           <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
             <button type="button" class="btn btn-secondary" id="btn-cancel-new-ad">Cancelar</button>
-            <button type="submit" class="btn btn-primary btn-lg">Publicar Anuncio</button>
+            <button type="submit" class="btn btn-primary btn-lg" id="btn-submit-new-ad">Publicar Anuncio</button>
           </div>
         </form>
       </div>
@@ -368,14 +395,57 @@ export const sellerDashboard = {
             </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Marca</label>
+              <input type="text" id="edit-ad-brand" class="form-input" value="${ad.brand || ''}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Modelo</label>
+              <input type="text" id="edit-ad-model" class="form-input" value="${ad.model || ''}" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Número de Serie / Identificador</label>
+              <input type="text" id="edit-ad-serial" class="form-input" value="${ad.serialNumber || ''}" />
+            </div>
+          </div>
+
+          <!-- Modificar Fotografía -->
+          <div class="form-group" style="background: #f8fafc; border: 1px solid var(--border-color); padding: 1.25rem; border-radius: var(--radius-md);">
+            <label class="form-label" style="font-weight: 700; margin-bottom: 0.5rem; display: block;">Fotografía</label>
+            <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem;">
+              <img src="${ad.image}" alt="${ad.title}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" />
+              <span style="font-size: 0.85rem; color: var(--text-muted);">Foto actual del anuncio</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <label style="font-size: 0.82rem; color: var(--text-muted);">Reemplazar por nuevo archivo (Supabase Storage privado):</label>
+              <input type="file" id="edit-ad-photo-file" class="form-input" accept="image/png, image/jpeg, image/jpg, image/webp" />
+              <label style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.25rem;">O ingresar URL externa (si no se sube archivo):</label>
+              <input type="url" id="edit-ad-image-url" class="form-input" value="${ad.imagePath && !ad.imagePath.startsWith('http') ? '' : (ad.imagePath || '')}" placeholder="https://... (URL externa alternativa)" />
+              <div id="edit-ad-photo-preview" style="display: none; align-items: center; gap: 1rem; padding: 0.5rem; background: #ffffff; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
+                <img id="edit-ad-preview-img" src="" alt="Nueva previa" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;" />
+                <div style="font-size: 0.8rem;">
+                  <span id="edit-ad-preview-name" style="font-weight: 600;"></span>
+                  <span id="edit-ad-preview-size" style="color: var(--text-muted); display: block;"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label">Descripción</label>
             <textarea id="edit-ad-desc" class="form-textarea">${ad.description || ''}</textarea>
           </div>
 
+          <!-- Mensaje de Error en Guardado -->
+          <div id="edit-ad-error-box" style="display: none; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 0.85rem 1rem; border-radius: var(--radius-md); margin-top: 1rem; font-size: 0.88rem;"></div>
+
           <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
             <button type="button" class="btn btn-secondary" id="btn-cancel-edit-ad">Cancelar</button>
-            <button type="submit" class="btn btn-primary btn-lg">Guardar Cambios</button>
+            <button type="submit" class="btn btn-primary btn-lg" id="btn-submit-edit-ad">Guardar Cambios</button>
           </div>
         </form>
       </div>
@@ -424,12 +494,66 @@ export const sellerDashboard = {
       });
     }
 
-    // Publicar Nuevo Anuncio
+    // Vista previa interactiva de archivos seleccionados
+    const setupPhotoPreview = (fileInputId, previewBoxId, previewImgId, previewNameId, previewSizeId) => {
+      const fileInp = container.querySelector(fileInputId);
+      const previewBox = container.querySelector(previewBoxId);
+      const previewImg = container.querySelector(previewImgId);
+      const previewName = container.querySelector(previewNameId);
+      const previewSize = container.querySelector(previewSizeId);
+
+      if (fileInp && previewBox && previewImg) {
+        fileInp.addEventListener('change', () => {
+          const file = fileInp.files && fileInp.files[0];
+          if (file) {
+            previewImg.src = URL.createObjectURL(file);
+            if (previewName) previewName.textContent = file.name;
+            if (previewSize) previewSize.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+            previewBox.style.display = 'flex';
+          } else {
+            previewBox.style.display = 'none';
+          }
+        });
+      }
+    };
+
+    setupPhotoPreview('#new-ad-photo-file', '#new-ad-photo-preview', '#new-ad-preview-img', '#new-ad-preview-name', '#new-ad-preview-size');
+    setupPhotoPreview('#edit-ad-photo-file', '#edit-ad-photo-preview', '#edit-ad-preview-img', '#edit-ad-preview-name', '#edit-ad-preview-size');
+
+    // Publicar Nuevo Anuncio (Conexión con Supabase Storage y DB)
     const formNew = container.querySelector('#form-publish-ad');
     if (formNew) {
-      formNew.addEventListener('submit', (e) => {
+      formNew.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const errorBox = container.querySelector('#new-ad-error-box');
+        const btnSubmit = container.querySelector('#btn-submit-new-ad');
+
+        const showError = (msg) => {
+          if (errorBox) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            alert(msg);
+          }
+          if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Publicar Anuncio';
+          }
+        };
+
+        if (errorBox) {
+          errorBox.textContent = '';
+          errorBox.style.display = 'none';
+        }
+
         const currentUser = auth.getCurrentUser();
+        if (!currentUser || !currentUser.id) {
+          showError('Debes iniciar sesión para publicar un anuncio.');
+          return;
+        }
+
         const title = container.querySelector('#new-ad-title').value.trim();
         const category = container.querySelector('#new-ad-category').value;
         const condition = container.querySelector('#new-ad-condition').value;
@@ -440,40 +564,123 @@ export const sellerDashboard = {
         const brand = container.querySelector('#new-ad-brand').value.trim();
         const model = container.querySelector('#new-ad-model').value.trim();
         const serial = container.querySelector('#new-ad-serial').value.trim();
-        const image = container.querySelector('#new-ad-image').value.trim();
+        const urlInput = container.querySelector('#new-ad-image-url');
+        const urlImage = urlInput ? urlInput.value.trim() : '';
         const desc = container.querySelector('#new-ad-desc').value.trim();
         const termsAccepted = container.querySelector('#check-accept-terms').checked;
 
         const norm = normalizeWhatsApp(whatsapp);
         if (!norm || norm.length < 10) {
-          alert('Por favor ingrese un número de WhatsApp válido con código internacional (mínimo 10 dígitos). Ejemplo: +54 9 11 5566-7788.');
+          showError('Por favor ingrese un número de WhatsApp válido con código internacional (mínimo 10 dígitos). Ejemplo: +54 9 11 5566-7788.');
           return;
         }
 
         if (!termsAccepted) {
-          alert('Debe aceptar los Términos de Uso y la Política de Privacidad para publicar.');
+          showError('Debe aceptar los Términos de Uso y la Política de Privacidad para publicar.');
           return;
         }
 
-        const newAd = state.addProduct({
+        const fileInp = container.querySelector('#new-ad-photo-file');
+        const file = fileInp && fileInp.files ? fileInp.files[0] : null;
+
+        let finalImageUrl = urlImage;
+
+        if (btnSubmit) {
+          btnSubmit.disabled = true;
+        }
+
+        const supabase = getSupabase();
+
+        // 1. Guardar foto en Supabase Storage si se eligió archivo
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            showError('La fotografía no puede superar los 5 MB de tamaño.');
+            return;
+          }
+          if (!file.type.startsWith('image/')) {
+            showError('El archivo debe ser una imagen válida (JPG, PNG o WebP).');
+            return;
+          }
+
+          if (btnSubmit) btnSubmit.textContent = 'Subiendo fotografía a Supabase Storage...';
+
+          if (!supabase) {
+            showError('No se pudo establecer conexión con Supabase Storage.');
+            return;
+          }
+
+          const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const filePath = `${currentUser.id}/${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('listing-photos')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (uploadError) {
+            showError(`Error al subir la fotografía a Supabase Storage: ${uploadError.message}. Verifique que el bucket 'listing-photos' esté creado (privado) y configurado.`);
+            return;
+          }
+
+          // Guardamos la ruta del archivo (no la URL pública) para el bucket privado.
+          // La imagen se cargará con la sesión autenticada mediante supabase.storage.download()
+          finalImageUrl = filePath;
+        }
+
+        if (!finalImageUrl) {
+          showError('Es obligatorio proporcionar una fotografía para publicar el anuncio (subir archivo o ingresar URL).');
+          return;
+        }
+
+        // 2. Guardar el anuncio en la tabla 'listings' de Supabase
+        if (btnSubmit) btnSubmit.textContent = 'Guardando publicación en Supabase...';
+
+        if (!supabase) {
+          showError('Servicio de base de datos Supabase no disponible.');
+          return;
+        }
+
+        const listingPayload = {
+          user_id: currentUser.id,
+          seller_name: currentUser.name || currentUser.email.split('@')[0],
           title,
           category,
           condition,
-          whatsapp,
+          whatsapp: norm,
           price,
           province,
           city,
-          brand,
-          model,
-          serialNumber: serial,
-          image,
-          description: desc,
-          sellerId: currentUser.id,
-          sellerName: currentUser.name
-        });
+          brand: brand || null,
+          model: model || null,
+          serial_number: serial || null,
+          image_url: finalImageUrl,
+          description: desc || null,
+          status: 'disponible',
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: 'v2.0-draft'
+        };
+
+        const { data: newListing, error: insertError } = await supabase
+          .from('listings')
+          .insert([listingPayload])
+          .select()
+          .single();
+
+        if (insertError) {
+          showError(`Error al guardar el anuncio en Supabase: ${insertError.message}. Verifique que la tabla 'listings' y sus permisos RLS estén aplicados.`);
+          return;
+        }
+
+        // 3. Confirmar la publicación ÚNICAMENTE cuando se haya guardado con éxito.
+        // Resolvemos el blob de la foto con la sesión activa para mostrarlo inmediatamente.
+        const resolvedNewImageUrl = newListing.image_url ? await loadListingImage(newListing.image_url) : '';
+        state.addProductFromSupabase(newListing, resolvedNewImageUrl || newListing.image_url);
 
         if (window.app && window.app.showToast) {
-          window.app.showToast('¡Tu anuncio ha sido publicado y está disponible en el catálogo!', 'success');
+          window.app.showToast('¡Tu anuncio ha sido publicado y guardado exitosamente en Supabase!', 'success');
         }
 
         this.activeTab = 'my-ads';
@@ -481,11 +688,46 @@ export const sellerDashboard = {
       });
     }
 
-    // Editar Anuncio Guardar
+    // Editar Anuncio Guardar (Supabase Update)
     const formEdit = container.querySelector('#form-edit-ad');
     if (formEdit) {
-      formEdit.addEventListener('submit', (e) => {
+      formEdit.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const errorBox = container.querySelector('#edit-ad-error-box');
+        const btnSubmit = container.querySelector('#btn-submit-edit-ad');
+
+        const showError = (msg) => {
+          if (errorBox) {
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
+            errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            alert(msg);
+          }
+          if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Guardar Cambios';
+          }
+        };
+
+        if (errorBox) {
+          errorBox.textContent = '';
+          errorBox.style.display = 'none';
+        }
+
+        const currentUser = auth.getCurrentUser();
+        if (!currentUser || !currentUser.id) {
+          showError('Debes iniciar sesión.');
+          return;
+        }
+
+        const currentAd = state.getProductById(this.editingAdId);
+        if (!currentAd) {
+          showError('Anuncio no encontrado para actualizar.');
+          return;
+        }
+
         const title = container.querySelector('#edit-ad-title').value.trim();
         const category = container.querySelector('#edit-ad-category').value;
         const condition = container.querySelector('#edit-ad-condition').value;
@@ -493,27 +735,113 @@ export const sellerDashboard = {
         const price = parseFloat(container.querySelector('#edit-ad-price').value);
         const province = container.querySelector('#edit-ad-province').value;
         const city = container.querySelector('#edit-ad-city').value.trim();
+        const brand = container.querySelector('#edit-ad-brand').value.trim();
+        const model = container.querySelector('#edit-ad-model').value.trim();
+        const serial = container.querySelector('#edit-ad-serial').value.trim();
+        const urlInput = container.querySelector('#edit-ad-image-url');
+        const urlImage = urlInput ? urlInput.value.trim() : '';
         const desc = container.querySelector('#edit-ad-desc').value.trim();
 
         const norm = normalizeWhatsApp(whatsapp);
         if (!norm || norm.length < 10) {
-          alert('Por favor ingrese un número de WhatsApp válido.');
+          showError('Por favor ingrese un número de WhatsApp válido.');
           return;
         }
 
-        state.updateProduct(this.editingAdId, {
-          title,
-          category,
-          condition,
-          whatsapp,
-          price,
-          province,
-          city,
-          description: desc
-        });
+        const fileInp = container.querySelector('#edit-ad-photo-file');
+        const file = fileInp && fileInp.files ? fileInp.files[0] : null;
+
+        // Para el campo image_url en la DB usamos imagePath (ruta en Storage) o URL externa.
+        // currentAd.image puede ser un blob: URL temporal — usamos imagePath para la persistencia.
+        let finalImageUrl = urlImage || currentAd.imagePath || currentAd.image;
+
+        if (btnSubmit) btnSubmit.disabled = true;
+        const supabase = getSupabase();
+
+        // Si se subió un nuevo archivo para la foto
+        if (file) {
+          if (file.size > 5 * 1024 * 1024) {
+            showError('La fotografía no puede superar 5 MB.');
+            return;
+          }
+
+          if (btnSubmit) btnSubmit.textContent = 'Subiendo fotografía actualizada...';
+
+          if (!supabase) {
+            showError('Conexión con Supabase no disponible.');
+            return;
+          }
+
+          const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+          const filePath = `${currentUser.id}/${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('listing-photos')
+            .upload(filePath, file, { cacheControl: '3600', upsert: false });
+
+          if (uploadError) {
+            showError(`Error al subir la nueva fotografía: ${uploadError.message}`);
+            return;
+          }
+
+          // Guardar la ruta del archivo (bucket privado): la imagen se carga con sesión.
+          finalImageUrl = filePath;
+        }
+
+        if (btnSubmit) btnSubmit.textContent = 'Guardando cambios en Supabase...';
+
+        // Actualizar en Supabase si está disponible
+        if (supabase) {
+          const { data: updatedListing, error: updateError } = await supabase
+            .from('listings')
+            .update({
+              title,
+              category,
+              condition,
+              whatsapp: norm,
+              price,
+              province,
+              city,
+              brand: brand || null,
+              model: model || null,
+              serial_number: serial || null,
+              image_url: finalImageUrl,
+              description: desc || null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', this.editingAdId)
+            .select()
+            .single();
+
+          if (updateError) {
+            showError(`Error al actualizar el anuncio en Supabase: ${updateError.message}`);
+            return;
+          }
+
+          if (updatedListing) {
+            const resolvedEditImageUrl = updatedListing.image_url ? await loadListingImage(updatedListing.image_url) : '';
+            state.addProductFromSupabase(updatedListing, resolvedEditImageUrl || updatedListing.image_url);
+          }
+        } else {
+          state.updateProduct(this.editingAdId, {
+            title,
+            category,
+            condition,
+            whatsapp: norm,
+            price,
+            province,
+            city,
+            brand,
+            model,
+            serialNumber: serial,
+            image: finalImageUrl,
+            description: desc
+          });
+        }
 
         if (window.app && window.app.showToast) {
-          window.app.showToast('Anuncio actualizado con éxito.', 'success');
+          window.app.showToast('Anuncio actualizado con éxito en Supabase.', 'success');
         }
 
         this.activeTab = 'my-ads';
@@ -522,17 +850,34 @@ export const sellerDashboard = {
       });
     }
 
-    // Acciones de tabla: Sold / Available
+    // Acciones de tabla: Marcar como Vendido / Disponible
     container.querySelectorAll('.btn-toggle-sold').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const action = btn.getAttribute('data-action');
-        if (action === 'sold') {
-          state.markProductAsSold(id);
-          if (window.app && window.app.showToast) window.app.showToast('Anuncio marcado como VENDIDO.', 'info');
-        } else {
-          state.markProductAsAvailable(id);
-          if (window.app && window.app.showToast) window.app.showToast('Anuncio marcado como DISPONIBLE.', 'success');
+        const newStatus = action === 'sold' ? 'vendido' : 'disponible';
+        const supabase = getSupabase();
+
+        btn.disabled = true;
+
+        if (supabase) {
+          const { error } = await supabase
+            .from('listings')
+            .update({ status: newStatus, updated_at: new Date().toISOString() })
+            .eq('id', id);
+
+          if (error) {
+            if (window.app && window.app.showToast) {
+              window.app.showToast(`Error al cambiar estado en Supabase: ${error.message}`, 'error');
+            }
+            btn.disabled = false;
+            return;
+          }
+        }
+
+        state.updateProduct(id, { status: newStatus });
+        if (window.app && window.app.showToast) {
+          window.app.showToast(`Anuncio marcado como ${newStatus.toUpperCase()}.`, 'success');
         }
         this.render();
       });
@@ -548,13 +893,30 @@ export const sellerDashboard = {
       });
     });
 
-    // Retirar / Eliminar botón
+    // Retirar / Eliminar anuncio (Solo el autor según RLS)
     container.querySelectorAll('.btn-delete-ad').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
-        if (confirm('¿Deseas retirar definitivamente este anuncio del catálogo?')) {
-          state.withdrawProduct(id);
-          if (window.app && window.app.showToast) window.app.showToast('Anuncio retirado del catálogo.', 'info');
+        if (confirm('¿Deseas retirar y eliminar definitivamente este anuncio del catálogo?')) {
+          const supabase = getSupabase();
+          if (supabase) {
+            const { error } = await supabase
+              .from('listings')
+              .delete()
+              .eq('id', id);
+
+            if (error) {
+              if (window.app && window.app.showToast) {
+                window.app.showToast(`Error al eliminar en Supabase: ${error.message}`, 'error');
+              }
+              return;
+            }
+          }
+
+          state.deleteProduct(id);
+          if (window.app && window.app.showToast) {
+            window.app.showToast('Anuncio eliminado con éxito.', 'info');
+          }
           this.render();
         }
       });

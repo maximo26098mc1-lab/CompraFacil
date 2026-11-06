@@ -2,6 +2,55 @@
 -- CompraFácil v2 - Esquema de Base de Datos y Políticas RLS (Supabase / PostgreSQL)
 -- ==============================================================================
 
+-- 0. TABLA DE PERFILES DE USUARIOS (SUPABASE AUTH)
+CREATE TABLE IF NOT EXISTS public.profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    full_name TEXT,
+    phone TEXT,
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role = 'user'), -- Impide elevar permisos
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Habilitar RLS estricto en perfiles
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+-- Política 1: Un usuario solo puede consultar su propio perfil (impide consultar perfiles ajenos)
+CREATE POLICY "Los usuarios solo pueden consultar su propio perfil"
+    ON public.profiles
+    FOR SELECT
+    TO authenticated
+    USING (auth.uid() = id);
+
+-- Política 2: Un usuario solo puede actualizar su propio perfil (nombre y teléfono)
+CREATE POLICY "Los usuarios solo pueden actualizar su propio perfil"
+    ON public.profiles
+    FOR UPDATE
+    TO authenticated
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
+
+-- Trigger del sistema (SECURITY DEFINER) para crear perfil automáticamente
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.profiles (id, full_name, phone, role)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+        'user' -- Siempre usuario común
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
 -- 1. TABLA DE ANUNCIOS CLASIFICADOS
 CREATE TABLE IF NOT EXISTS public.anuncios (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
